@@ -1,0 +1,17 @@
+cookie_date         : delimiter* date_token_list delimiter*
+date_token_list     : date_token ( delimiter+ date_token)*
+date_token          : _non_delimiter+
+delimiter           : "\x09" | (/[\x20-\x2F]/) | (/[\x3B-\x40]/) | (/[\x5B-\x60]/) | (/[\x7B-\x7E]/)
+!_non_delimiter       : (/[\x00-\x08]/) | (/[\x0A-\x1F]/) | DIGIT | ":" | ALPHA | (/[\x7F-\xFF]/)
+non_digit           : (/[\x00-\x2F]/) | (/[\x3A-\xFF]/)
+day_of_month        : DIGIT~1..2
+month               : ( "jan"i | "feb"i | "mar"i | "apr"i
+                       | "may"i | "jun"i | "jul"i | "aug"i
+                       | "sep"i | "oct"i | "nov"i | "dec"i )
+year                : DIGIT~2..4
+time                : time_field ":" time_field ":" time_field
+time_field          : DIGIT~1..2
+
+%import .rfc5234_core.DIGIT
+%import .rfc5234_core.ALPHA
+%import .rfc5234_core.OCTET

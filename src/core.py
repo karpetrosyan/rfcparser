@@ -1,12 +1,18 @@
-from lark import Lark
+import os
+
+from lark import Lark, Token
 from pathlib import Path
 from datetime import datetime
+from object_abstractions import SetCookie6265
 
 from exceptions import ValidationException, ParseException
 
+# Files
+RFC6265_DATE = "rfc6265_date.lark"
+RFC6265_DATE_IMPORTED = "%s__" % (RFC6265_DATE.split(".")[0],)
+
 
 class LazyLoadLark:
-
     def __init__(self, value, **kwargs):
         self.value = value
         self.parser = None
@@ -16,16 +22,16 @@ class LazyLoadLark:
         if self.parser is None:
             path = str(Path(__file__).parent / self.value)
             with open(path) as f:
-                print('loading')
                 self.parser = Lark(f.read(), **self.kwargs)
                 del self.kwargs
         return self.parser
 
 
-class DateParseManager:
-    default_start = 'cookie_date'
-    date_parser = LazyLoadLark('rfc6265_date.lark', start=["cookie_date", "time",
-                                                           "year", "month", "day_of_month"])
+class DateParseManager6265:
+    default_start = "cookie_date"
+    date_parser = LazyLoadLark(
+        RFC6265_DATE, start=["cookie_date", "time", "year", "month", "day_of_month"]
+    )
 
     month_map = {
         "jan": 1,
@@ -39,8 +45,15 @@ class DateParseManager:
         "sep": 9,
         "oct": 10,
         "nov": 11,
-        "dec": 12
+        "dec": 12,
     }
+
+    # rules
+    DATE_TOKEN = "date_token"
+    TIME = "time"
+    YEAR = "year"
+    MONTH = "month"
+    DAY_OF_MONTH = "day_of_month"
 
     def can_parse(self, value, start=None):
         try:
@@ -49,7 +62,7 @@ class DateParseManager:
         except Exception as e:
             return False
 
-    def date_parse(self, value, start=None):
+    def tree_parse(self, tree):
         found_time = None
         found_day_of_month = None
         found_month = None
@@ -61,31 +74,33 @@ class DateParseManager:
         day_of_month_value = None
         month_value = None
 
-        try:
-            tree = self.date_parser.parse(value, start=start or self.default_start)
-        except Exception as ex:
-            raise ParseException from ex
         date_tokens = tree.children[0]
         date_tokens_values = []
+
         for token in date_tokens.children:
-            if token.data == 'date_token':
-                date_tokens_values.append(''.join(non_delimiter.value for
-                                                  non_delimiter in token.children))
+            if (token.data == self.DATE_TOKEN) or (
+                token.data == RFC6265_DATE_IMPORTED + self.DATE_TOKEN
+            ):
+                date_tokens_values.append(
+                    "".join(non_delimiter.value for non_delimiter in token.children)
+                )
         for token in date_tokens_values:
-            if (found_time is None) and self.can_parse(token, 'time'):
+            if (found_time is None) and self.can_parse(token, self.TIME):
                 found_time = token
-                h, m, s = token.split(':')
+                h, m, s = token.split(":")
                 hour_value = int(h)
                 minute_value = int(m)
                 second_value = int(s)
-            elif found_day_of_month is None and self.can_parse(token, 'day_of_month'):
+            elif found_day_of_month is None and self.can_parse(
+                token, self.DAY_OF_MONTH
+            ):
                 found_day_of_month = token
                 day_of_month_value = int(token)
 
-            elif found_month is None and self.can_parse(token, "month"):
+            elif found_month is None and self.can_parse(token, self.MONTH):
                 found_month = token
                 month_value = self.month_map[token.lower()]
-            elif found_year is None and self.can_parse(token, "year"):
+            elif found_year is None and self.can_parse(token, self.YEAR):
                 found_year = token
                 year_value = int(token)
 
@@ -97,13 +112,20 @@ class DateParseManager:
 
         if not (found_time and found_month and found_year and found_day_of_month):
             missing_attributes = []
-            if not found_time: missing_attributes.append('time')
-            if not found_month: missing_attributes.append('month')
-            if not found_year: missing_attributes.append('year')
-            if not found_day_of_month: missing_attributes.append('day_of_month')
+            if not found_time:
+                missing_attributes.append("time")
+            if not found_month:
+                missing_attributes.append("month")
+            if not found_year:
+                missing_attributes.append("year")
+            if not found_day_of_month:
+                missing_attributes.append("day_of_month")
             raise ValidationException(
-                ("One or more attributes aren't being"
-                 "passed. Missing attributes : %s" % (missing_attributes,)))
+                (
+                    "One or more attributes aren't being"
+                    "passed. Missing attributes : %s" % (missing_attributes,)
+                )
+            )
         if 1 > day_of_month_value or day_of_month_value > 31:
             raise ValidationException("The month's day must be between [1, 31].")
         if year_value < 1601:
@@ -115,7 +137,102 @@ class DateParseManager:
         if second_value > 59:
             raise ValidationException("The second value cannot be greater than 59.")
 
-        date = datetime(year=year_value, day=day_of_month_value,
-                        month=month_value, minute=minute_value,
-                        hour=hour_value, second=second_value)
+        date = datetime(
+            year=year_value,
+            day=day_of_month_value,
+            month=month_value,
+            minute=minute_value,
+            hour=hour_value,
+            second=second_value,
+        )
         return date
+
+    def parse(self, value, start=None):
+
+        try:
+            tree = self.date_parser.parse(value, start=start or self.default_start)
+            return self.tree_parse(tree)
+        except Exception as ex:
+            raise ParseException from ex
+
+
+class SetCookieParseManager6265:
+    default_start = "set_cookie_header"
+    set_cookie_parser = LazyLoadLark(
+        "rfc6265_set_cookie.lark", start=["set_cookie_header"]
+    )
+
+    def tree_parse(self, tree):
+        (cookie_name,) = tuple(tree.find_data("cookie_name"))
+        (cookie_value,) = tuple(tree.find_data("cookie_value"))
+
+        cookie_name = "".join(token.value for token in cookie_name.children)
+        cookie_value = "".join(token.value for token in cookie_value.children)
+
+        attrs = {}
+        (attrs_node,) = tuple(tree.find_data("cookie_av"))
+        for attr in attrs_node.children:
+
+            if attr.data == "expires_av":
+                cookie_date_parser = DateParseManager6265()
+                cookie_date_parser.tree_parse(attr.children[0].children[0])
+        set_cookie = SetCookie6265(key=cookie_name, value=cookie_value, attrs=attrs)
+        return set_cookie
+
+    def parse(self, value, start=None):
+        try:
+            tree = self.set_cookie_parser.parse(
+                value, start=start or self.default_start
+            )
+            return self.tree_parse(tree)
+        except Exception as ex:
+            raise ParseException from ex
+
+
+class DomainParse822:
+    default_start = "domain"
+    domain_parser = LazyLoadLark("rfc822_domain.lark", start=["domain"])
+
+    def tree_parse(self, tree):
+        sub_domains = []
+        for sub_domain in tree.children:
+            label = "".join(token.value for token in sub_domain.children)
+            sub_domains.append(label)
+        return sub_domains
+
+    def parse(self, value, start=None):
+        try:
+            tree = self.domain_parser.parse(value, start=start or self.default_start)
+            return self.tree_parse(tree)
+        except Exception as ex:
+            raise ParseException from ex
+
+
+class DomainParse1034:
+    default_start = "domain"
+    domain_parser = LazyLoadLark("rfc1034_domain.lark", start=["domain"])
+
+    def tree_parse(self, tree):
+        first_subdomain = tree.children[0]
+        subdomains = []
+
+        def subdomain_collector(node):
+            start = 0
+            if not isinstance(node.children[0], Token):
+                start += 1
+                subdomain_collector(node.children[0])
+
+            children = ""
+            for i in range(start, len(node.children)):
+                children += node.children[i].value
+            subdomains.append(children)
+
+        subdomain_collector(first_subdomain)
+        return subdomains
+
+    def parse(self, value, start=None):
+        try:
+            tree = self.domain_parser.parse(value, start=start or self.default_start)
+            return self.tree_parse(tree)
+        except Exception as ex:
+            raise ParseException from ex

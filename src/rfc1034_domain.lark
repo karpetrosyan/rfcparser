@@ -1,0 +1,9 @@
+domain      : subdomain | " "
+subdomain   : _label | subdomain "."  _label
+_label       : _letter [ [ _ldh_str ] _let_dig ]
+_ldh_str     : _let_dig_hyp | _let_dig_hyp _ldh_str
+_let_dig_hyp : _let_dig | "-"
+_let_dig     : _letter | DIGIT
+_letter      : /[a-zA-Z]/
+
+%import .rfc5234_core.DIGIT

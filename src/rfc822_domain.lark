@@ -1,0 +1,8 @@
+domain          : sub_domain ( "." sub_domain )*
+sub_domain      : _domain_ref | domain_literal
+_domain_ref      : _atom
+_atom            : /[^ \x00-\x1f]/+
+domain_literal  : "[" (dtext | quoted_pair)* "]"
+dtext           : /"[^\[]"/
+quoted_pair     : "\\" CHAR
+CHAR            : /[\x00-\x7f]/

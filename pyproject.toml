@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "rfcparser"
 dynamic = ["version"]
 dependencies = ["lark"]
+readme = "README.md"
 
 [tool]
 

@@ -1,11 +1,11 @@
 import os
+from datetime import datetime
+from pathlib import Path
 
 from lark import Lark, Token
-from pathlib import Path
-from datetime import datetime
-from .object_abstractions import SetCookie6265, Uri3986
 
-from .exceptions import ValidationException, ParseException
+from .exceptions import ParseException, ValidationException
+from .object_abstractions import SetCookie6265, Uri3986
 
 # Files
 RFC6265_DATE = "grammars/rfc6265_date.lark"
@@ -87,9 +87,7 @@ class DateParseManager6265:
         for token in date_tokens.children:
 
             if (token.data == self.DATE_TOKEN) or ():
-                date_tokens_values.append(
-                    collect_tokens(token)
-                )
+                date_tokens_values.append(collect_tokens(token))
         for token in date_tokens_values:
             if (found_time is None) and self.can_parse(token, self.TIME):
                 found_time = token
@@ -98,7 +96,7 @@ class DateParseManager6265:
                 minute_value = int(m)
                 second_value = int(s)
             elif found_day_of_month is None and self.can_parse(
-                    token, self.DAY_OF_MONTH
+                token, self.DAY_OF_MONTH
             ):
                 found_day_of_month = token
                 day_of_month_value = int(token)
@@ -128,8 +126,8 @@ class DateParseManager6265:
                 missing_attributes.append("day_of_month")
             raise ValidationException(
                 (
-                        "One or more attributes aren't being"
-                        "passed. Missing attributes : %s" % (missing_attributes,)
+                    "One or more attributes aren't being"
+                    "passed. Missing attributes : %s" % (missing_attributes,)
                 )
             )
         if 1 > day_of_month_value or day_of_month_value > 31:
@@ -164,9 +162,7 @@ class DateParseManager6265:
 
 class SetCookieParseManager6265:
     default_start = "set_cookie_header"
-    set_cookie_parser = LazyLoadLark(
-        RFC6265_SETCOOKIE, start=["set_cookie_header"]
-    )
+    set_cookie_parser = LazyLoadLark(RFC6265_SETCOOKIE, start=["set_cookie_header"])
 
     def tree_parse(self, tree):
         (cookie_name,) = tuple(tree.find_data("cookie_name"))

@@ -314,7 +314,7 @@ class UriParse3986:
 
         return Uri3986(
             scheme=scheme,
-            ip=ip,
+            ip=tmp_ip or ip,
             port=int(port) if port else None,
             host=host,
             userinfo=userinfo,

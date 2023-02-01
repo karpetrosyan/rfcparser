@@ -1,0 +1,68 @@
+//         foo://example.com:8042/over/there?name=ferret#nose
+//         \_/   \______________/\_________/ \_________/ \__/
+//          |           |            |            |        |
+//       scheme     authority       path        query   fragment
+//          |   _____________________|__
+//         / \ /                        \
+//         urn:example:animal:ferret:nose
+
+uri         : scheme ":" hier_part [ "?" query ] [ "#" fragment ]
+hier_part   : "//" authority path_abempty
+                | path_absolute
+                | path_rootless
+                | path_empty
+
+scheme      : ALPHA ( ALPHA | DIGIT | "+" | "-" | "." )*
+authority   : [ userinfo "@" ] host [ ":" port ]
+!userinfo    : ( _unreserved | pct_encoded | sub_delims | ":" )*
+host        : ip_literal | ip_4address | reg_name
+ip_literal  : "[" ( ip_6address | ip_future  ) "]"
+ip_future   : "v" HEXDIG+ "." ( _unreserved | sub_delims | ":" )+
+ip_6address :     ( h16 ":" )~6..6 ls32
+                  |                         "::" ( h16 ":" )~5..5 ls32
+                  | [                 h16 ] "::" ( h16 ":" )~4..4 ls32
+                  | [ ( h16 ":" )~0..1 h16 ] "::" ( h16 ":" )~3..3 ls32
+                  | [ ( h16 ":" )~0..2 h16 ] "::" ( h16 ":" )~2..2 ls32
+                  | [ ( h16 ":" )~0..3 h16 ] "::"   h16 ":"       ls32
+                  | [ ( h16 ":" )~0..4 h16 ] "::"                 ls32
+                  | [ ( h16 ":" )~0..5 h16 ] "::"                 h16
+                  | [ ( h16 ":" )~0..6 h16 ] "::"
+ls32        : ( h16 ":" h16 ) | ip_4address
+h16         : HEXDIG~1..4
+ip_4address : dec_octet "." dec_octet "." dec_octet "." dec_octet
+!dec_octet   : DIGIT
+          |  (/[ 0x31 - 0x39 ]/) DIGIT
+          | "1" DIGIT~2..2
+          | "2" (/[0x30 - 0x34]/) DIGIT
+          | "25"(/[0x30 - 0x35]/)
+reg_name    : ( _unreserved | pct_encoded | sub_delims )*
+port        : DIGIT*
+path        : path_abempty    // begins with "/" or is empty
+            | path_absolute   // begins with "/" but not "//"
+            | path_noscheme   // begins with a non-colon segment
+            | path_rootless   // begins with a segment
+            | path_empty      // zero characters
+path_abempty  : ( "/" segment )*
+path_absolute : "/" [ segment_nz ( "/" segment )* ]
+path_noscheme : segment_nz_nc ( "/" segment )*
+path_rootless : segment_nz ( "/" segment )*
+path_empty    : _pchar*
+segment       : _pchar*
+segment_nz    : _pchar+
+segment_nz_nc : ( _unreserved | pct_encoded | sub_delims | "@" )+
+
+_pchar         : _unreserved | pct_encoded | sub_delims | ":" | "@"
+query         : ( _pchar | "/" | "?" )*
+fragment      : ( _pchar | "/" | "?" )*
+
+pct_encoded   : "%" HEXDIG HEXDIG
+!_unreserved    : ALPHA | DIGIT | "-" | "." | "_" | "~"
+reserved      : gen_delims | sub_delims
+gen_delims    : ":" | "/" | "?" | "#" | "[" | "]" | "@"
+sub_delims    : "!" | "$" | "&" | "'" | "(" | ")"
+                 | "*" | "+" | "," | ";" | "="
+
+%import .rfc5234_core.DIGIT
+%import .rfc5234_core.ALPHA
+%import .rfc5234_core.OCTET
+%import .rfc5234_core.HEXDIG

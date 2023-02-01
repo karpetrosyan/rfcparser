@@ -3,13 +3,17 @@ import os
 from lark import Lark, Token
 from pathlib import Path
 from datetime import datetime
-from object_abstractions import SetCookie6265
+from object_abstractions import SetCookie6265, Uri3986
 
 from exceptions import ValidationException, ParseException
 
 # Files
 RFC6265_DATE = "rfc6265_date.lark"
 RFC6265_DATE_IMPORTED = "%s__" % (RFC6265_DATE.split(".")[0],)
+
+
+def collect_tokens(tree):
+    return "".join(token.value for token in tree.children)
 
 
 class LazyLoadLark:
@@ -233,6 +237,97 @@ class DomainParse1034:
     def parse(self, value, start=None):
         try:
             tree = self.domain_parser.parse(value, start=start or self.default_start)
+            return self.tree_parse(tree)
+        except Exception as ex:
+            raise ParseException from ex
+
+
+class UriParse3986:
+    default_start = "uri"
+    uri_parser = LazyLoadLark("rfc3986_uri.lark", start="uri")
+
+    def tree_parse(self, tree):
+        # trees
+        (authority,) = tree.find_data("authority")
+        (hier_part,) = tree.find_data("hier_part")
+        path_tree = hier_part.children[-1]
+        try:
+            (query_tree,) = tree.find_data("query")
+        except ValueError:
+            query_tree = None
+        try:
+            (fragment,) = tree.find_data("fragment")
+            fragment = collect_tokens(fragment)
+        except ValueError:
+            fragment = None
+
+        scheme = collect_tokens(tree.children[0])
+        tmp_ip = ""
+        ip = None
+        port = None
+        host = None
+        userinfo = None
+        tmp_path = ""
+        path = None
+        query = {}
+
+        query_temp_key_value = ["", ""]
+        query_switch = 0
+
+        for child in authority.children:
+
+            if child:
+                if child.data == "host":
+                    first_child = child.children[0]
+                    if first_child.data == "ip_4address":
+                        for dec_octet in first_child.children:
+                            tmp_ip += collect_tokens(dec_octet) + "."
+                        tmp_ip = ip[:-1]
+                    elif first_child.data == "reg_name":
+                        host = collect_tokens(first_child).split(".")
+                    elif first_child.data == "ip_6address":
+                        raise NotImplementedError(
+                            "Parsertool does not support ipv6 addresses"
+                        )
+
+                elif child.data == "port":
+                    port = collect_tokens(child)
+
+                elif child.data == "userinfo":
+                    userinfo = collect_tokens(child)
+
+        for child in path_tree.children:
+            tmp_path += "/" + collect_tokens(child)
+
+        if query_tree:
+            for child in query_tree.children:
+                if not isinstance(child, Token):
+                    query_switch += 1
+                    if query_switch == 2:
+                        key, value = query_temp_key_value
+                        query[key] = value
+                        query_temp_key_value = ["", ""]
+                        query_switch = 0
+                else:
+                    query_temp_key_value[query_switch] += child.value
+            if query_switch == 1:
+                key, value = query_temp_key_value
+                query[key] = value
+
+        return Uri3986(
+            scheme=scheme,
+            ip=ip,
+            port=int(port),
+            host=host,
+            userinfo=userinfo,
+            path=tmp_path or path,
+            query=query,
+            fragment=fragment,
+        )
+
+    def parse(self, value, start=None):
+        try:
+            tree = self.uri_parser.parse(value, start=start or self.default_start)
             return self.tree_parse(tree)
         except Exception as ex:
             raise ParseException from ex

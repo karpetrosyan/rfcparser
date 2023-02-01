@@ -10,4 +10,4 @@ dependencies = ["lark"]
 [tool]
 
 [tool.hatch.version]
-path = "src/__init__.py"
+path = "rfcparser/__init__.py"

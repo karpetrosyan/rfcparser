@@ -3,16 +3,18 @@ import os
 from lark import Lark, Token
 from pathlib import Path
 from datetime import datetime
-from object_abstractions import SetCookie6265, Uri3986
+from .object_abstractions import SetCookie6265, Uri3986
 
-from exceptions import ValidationException, ParseException
+from .exceptions import ValidationException, ParseException
 
 # Files
-RFC6265_DATE = "rfc6265_date.lark"
-RFC6265_SETCOOKIE = "rfc6265_set_cookie.lark"
-RFC1034_DOMAIN = "rfc1034_domain.lark"
-RFC822_DOMAIN = "rfc822_domain.lark"
-RFC3986_URI = "rfc3986_uri.lark"
+RFC6265_DATE = "grammars/rfc6265_date.lark"
+RFC6265_SETCOOKIE = "grammars/rfc6265_set_cookie.lark"
+RFC1034_DOMAIN = "grammars/rfc1034_domain.lark"
+RFC822_DOMAIN = "grammars/rfc822_domain.lark"
+RFC3986_URI = "grammars/rfc3986_uri.lark"
+
+
 def collect_tokens(tree):
     return "".join(token.value for token in tree.children)
 
@@ -27,7 +29,7 @@ class LazyLoadLark:
         if self.parser is None:
             path = str(Path(__file__).parent / self.value)
             with open(path) as f:
-                self.parser = Lark(f.read(), **self.kwargs)
+                self.parser = Lark(open(path).read(), source_path=path, **self.kwargs)
                 del self.kwargs
         return self.parser
 
@@ -96,7 +98,7 @@ class DateParseManager6265:
                 minute_value = int(m)
                 second_value = int(s)
             elif found_day_of_month is None and self.can_parse(
-                token, self.DAY_OF_MONTH
+                    token, self.DAY_OF_MONTH
             ):
                 found_day_of_month = token
                 day_of_month_value = int(token)
@@ -126,8 +128,8 @@ class DateParseManager6265:
                 missing_attributes.append("day_of_month")
             raise ValidationException(
                 (
-                    "One or more attributes aren't being"
-                    "passed. Missing attributes : %s" % (missing_attributes,)
+                        "One or more attributes aren't being"
+                        "passed. Missing attributes : %s" % (missing_attributes,)
                 )
             )
         if 1 > day_of_month_value or day_of_month_value > 31:
@@ -317,7 +319,7 @@ class UriParse3986:
         return Uri3986(
             scheme=scheme,
             ip=ip,
-            port=int(port),
+            port=int(port) if port else None,
             host=host,
             userinfo=userinfo,
             path=tmp_path or path,

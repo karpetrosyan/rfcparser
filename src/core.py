@@ -9,9 +9,10 @@ from exceptions import ValidationException, ParseException
 
 # Files
 RFC6265_DATE = "rfc6265_date.lark"
-RFC6265_DATE_IMPORTED = "%s__" % (RFC6265_DATE.split(".")[0],)
-
-
+RFC6265_SETCOOKIE = "rfc6265_set_cookie.lark"
+RFC1034_DOMAIN = "rfc1034_domain.lark"
+RFC822_DOMAIN = "rfc822_domain.lark"
+RFC3986_URI = "rfc3986_uri.lark"
 def collect_tokens(tree):
     return "".join(token.value for token in tree.children)
 
@@ -82,11 +83,10 @@ class DateParseManager6265:
         date_tokens_values = []
 
         for token in date_tokens.children:
-            if (token.data == self.DATE_TOKEN) or (
-                token.data == RFC6265_DATE_IMPORTED + self.DATE_TOKEN
-            ):
+
+            if (token.data == self.DATE_TOKEN) or ():
                 date_tokens_values.append(
-                    "".join(non_delimiter.value for non_delimiter in token.children)
+                    collect_tokens(token)
                 )
         for token in date_tokens_values:
             if (found_time is None) and self.can_parse(token, self.TIME):
@@ -163,15 +163,15 @@ class DateParseManager6265:
 class SetCookieParseManager6265:
     default_start = "set_cookie_header"
     set_cookie_parser = LazyLoadLark(
-        "rfc6265_set_cookie.lark", start=["set_cookie_header"]
+        RFC6265_SETCOOKIE, start=["set_cookie_header"]
     )
 
     def tree_parse(self, tree):
         (cookie_name,) = tuple(tree.find_data("cookie_name"))
         (cookie_value,) = tuple(tree.find_data("cookie_value"))
 
-        cookie_name = "".join(token.value for token in cookie_name.children)
-        cookie_value = "".join(token.value for token in cookie_value.children)
+        cookie_name = collect_tokens(cookie_name(cookie_name))
+        cookie_value = collect_tokens(cookie_value)
 
         attrs = {}
         (attrs_node,) = tuple(tree.find_data("cookie_av"))
@@ -195,12 +195,12 @@ class SetCookieParseManager6265:
 
 class DomainParse822:
     default_start = "domain"
-    domain_parser = LazyLoadLark("rfc822_domain.lark", start=["domain"])
+    domain_parser = LazyLoadLark(RFC822_DOMAIN, start=["domain"])
 
     def tree_parse(self, tree):
         sub_domains = []
         for sub_domain in tree.children:
-            label = "".join(token.value for token in sub_domain.children)
+            label = collect_tokens(sub_domain)
             sub_domains.append(label)
         return sub_domains
 
@@ -214,7 +214,7 @@ class DomainParse822:
 
 class DomainParse1034:
     default_start = "domain"
-    domain_parser = LazyLoadLark("rfc1034_domain.lark", start=["domain"])
+    domain_parser = LazyLoadLark(RFC1034_DOMAIN, start=["domain"])
 
     def tree_parse(self, tree):
         first_subdomain = tree.children[0]
@@ -244,7 +244,7 @@ class DomainParse1034:
 
 class UriParse3986:
     default_start = "uri"
-    uri_parser = LazyLoadLark("rfc3986_uri.lark", start="uri")
+    uri_parser = LazyLoadLark(RFC3986_URI, start="uri")
 
     def tree_parse(self, tree):
         # trees

@@ -280,7 +280,7 @@ class UriParse3986:
                     if first_child.data == "ip_4address":
                         for dec_octet in first_child.children:
                             tmp_ip += collect_tokens(dec_octet) + "."
-                        tmp_ip = ip[:-1]
+                        tmp_ip = tmp_ip[:-1]
                     elif first_child.data == "reg_name":
                         host = collect_tokens(first_child).split(".")
                     elif first_child.data == "ip_6address":

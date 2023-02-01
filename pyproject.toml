@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rfcparser"
+dynamic = ["version"]
+dependencies = ["lark"]
+
+[tool]
+
+[tool.hatch.version]
+path = "src/__init__.py"

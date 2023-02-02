@@ -329,3 +329,4 @@ class UriParse3986:
             return self.tree_parse(tree)
         except Exception as ex:
             raise ParseException from ex
+

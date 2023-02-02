@@ -1,0 +1,12 @@
+[
+  "object_abstractions_test.py::TestUri3986::test_parsing[http://example.com-expected0]",
+  "object_abstractions_test.py::TestUri3986::test_parsing[https://127.0.0.1/path?name=test#fr-expected1]",
+  "object_abstractions_test.py::TestUri3986::test_parsing[https://testdata@127.0.0.1:1010/path?name=test#fr-expected2]",
+  "object_abstractions_test.py::TestUri3986::test_update_path[value0-/new/path-https://google.com/new/path?name=test]",
+  "object_abstractions_test.py::TestUri3986::test_update_path[value1-new/path-https://google.com/new/path?name=test]",
+  "object_abstractions_test.py::TestUri3986::test_update_path[value2--https://google.com/?name=test]",
+  "object_abstractions_test.py::TestUriTest::test_uri3986_test",
+  "object_abstractions_test.py::TestUriTest::test_uri3986_test[http://example.com-expected0]",
+  "object_abstractions_test.py::TestUriTest::test_uri3986_test[https://127.0.0.1/path?name=test#fr-expected1]",
+  "object_abstractions_test.py::TestUriTest::test_uri3986_test[https://testdata@127.0.0.1:1010/path?name=test#fr-expected2]"
+]

@@ -34,7 +34,7 @@ class LazyLoadLark:
         return self.parser
 
 
-class DateParseManager6265:
+class DateParser6265:
     default_start = "cookie_date"
     date_parser = LazyLoadLark(
         RFC6265_DATE, start=["cookie_date", "time", "year", "month", "day_of_month"]
@@ -96,7 +96,7 @@ class DateParseManager6265:
                 minute_value = int(m)
                 second_value = int(s)
             elif found_day_of_month is None and self.can_parse(
-                token, self.DAY_OF_MONTH
+                    token, self.DAY_OF_MONTH
             ):
                 found_day_of_month = token
                 day_of_month_value = int(token)
@@ -126,8 +126,8 @@ class DateParseManager6265:
                 missing_attributes.append("day_of_month")
             raise ValidationException(
                 (
-                    "One or more attributes aren't being"
-                    "passed. Missing attributes : %s" % (missing_attributes,)
+                        "One or more attributes aren't being"
+                        "passed. Missing attributes : %s" % (missing_attributes,)
                 )
             )
         if 1 > day_of_month_value or day_of_month_value > 31:
@@ -160,38 +160,56 @@ class DateParseManager6265:
             raise ParseException from ex
 
 
-class SetCookieParseManager6265:
+class SetCookieParser6265:
     default_start = "set_cookie_header"
     set_cookie_parser = LazyLoadLark(RFC6265_SETCOOKIE, start=["set_cookie_header"])
 
-    def tree_parse(self, tree):
+    def tree_parse(self, tree, uri):
         (cookie_name,) = tuple(tree.find_data("cookie_name"))
         (cookie_value,) = tuple(tree.find_data("cookie_value"))
 
-        cookie_name = collect_tokens(cookie_name(cookie_name))
-        cookie_value = collect_tokens(cookie_value)
+        cookie_name = collect_tokens(cookie_name).strip()
+        cookie_value = collect_tokens(cookie_value).strip()
 
         attrs = {}
-        (attrs_node,) = tuple(tree.find_data("cookie_av"))
-        for attr in attrs_node.children:
+        attrs_nodes = tuple(tree.find_data("cookie_av"))
 
-            if attr.data == "expires_av":
-                cookie_date_parser = DateParseManager6265()
-                cookie_date_parser.tree_parse(attr.children[0].children[0])
-        set_cookie = SetCookie6265(key=cookie_name, value=cookie_value, attrs=attrs)
+        for attrs_node in attrs_nodes:
+            for attr in attrs_node.children:
+
+                if attr.data == "expires_av":
+                    cookie_date_parser = DateParser6265()
+                    expire_date = cookie_date_parser.tree_parse(attr.children[0].children[0])
+                    attrs['Expires'] = expire_date
+                elif attr.data == "path_av":
+                    path = collect_tokens(attr.children[0])
+                    attrs['Path'] = path
+                elif attr.data == "httponly_av":
+                    attrs['HttpOnly'] = True
+                elif attr.data == "max_age_av":
+                    attrs['Max-Age'] = collect_tokens(attr)
+                elif attr.data == "secure_av":
+                    attrs['Secure'] = True
+                elif attr.data == "domain_av":
+                    attrs['Domain'] = collect_tokens(attr.children[0].children[0])
+                elif attr.data == 'extension_av':
+                    key, value = collect_tokens(attr).split('=')
+                    attrs[key] = value
+        set_cookie = SetCookie6265(key=cookie_name, value=cookie_value, attrs=attrs, uri=uri)
+
         return set_cookie
 
-    def parse(self, value, start=None):
+    def parse(self, value, uri, start=None):
         try:
             tree = self.set_cookie_parser.parse(
                 value, start=start or self.default_start
             )
-            return self.tree_parse(tree)
+            return self.tree_parse(tree, uri)
         except Exception as ex:
             raise ParseException from ex
 
 
-class DomainParse822:
+class DomainParser822:
     default_start = "domain"
     domain_parser = LazyLoadLark(RFC822_DOMAIN, start=["domain"])
 
@@ -210,7 +228,7 @@ class DomainParse822:
             raise ParseException from ex
 
 
-class DomainParse1034:
+class DomainParser1034:
     default_start = "domain"
     domain_parser = LazyLoadLark(RFC1034_DOMAIN, start=["domain"])
 
@@ -240,9 +258,9 @@ class DomainParse1034:
             raise ParseException from ex
 
 
-class UriParse3986:
+class UriParser3986:
     default_start = "uri"
-    uri_parser = LazyLoadLark(RFC3986_URI, start="uri")
+    uri_parser = LazyLoadLark(RFC3986_URI, start=["uri", "relative_ref"])
 
     def tree_parse(self, tree):
         # trees
@@ -329,4 +347,3 @@ class UriParse3986:
             return self.tree_parse(tree)
         except Exception as ex:
             raise ParseException from ex
-

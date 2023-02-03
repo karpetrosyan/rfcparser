@@ -11,6 +11,16 @@ hier_part   : "//" authority path_abempty
                 | path_absolute
                 | path_rootless
                 | path_empty
+uri_reference : uri | relative_ref
+
+absolute_uri  : scheme ":" hier_part [ "?" query ]
+
+relative_ref  : relative_part [ "?" query ] [ "#" fragment ]
+
+relative_part : "//" authority path_abempty
+             | path_absolute
+             | path_noscheme
+             | path_empty
 
 scheme      : ALPHA ( ALPHA | DIGIT | "+" | "-" | "." )*
 authority   : [ userinfo "@" ] host [ ":" port ]

@@ -1,4 +1,4 @@
-from rfcparser.core import UriParse3986
+from rfcparser.core import UriParser3986
 from rfcparser.object_abstractions import Uri3986
 import pytest
 
@@ -33,7 +33,7 @@ class TestUri3986:
                                                                                  fragment="fr"))
                              ])
     def test_parsing(self, value, expected):
-        parsed = UriParse3986().parse(value)
+        parsed = UriParser3986().parse(value)
 
         assert parsed.scheme == expected.scheme
         assert parsed.ip == expected.ip
@@ -47,13 +47,34 @@ class TestUri3986:
 
     @pytest.mark.parametrize("value, newvalue, expected",
                              [
-                                 (UriParse3986().parse("https://google.com/path?name=test"),
+                                 (UriParser3986().parse("https://google.com/path?name=test"),
                                     "/new/path", "https://google.com/new/path?name=test",),
-                                 (UriParse3986().parse("https://google.com/path?name=test"),
+                                 (UriParser3986().parse("https://google.com/path?name=test"),
                                   "new/path", "https://google.com/new/path?name=test",),
-                                 (UriParse3986().parse("https://google.com/path?name=test"),
+                                 (UriParser3986().parse("https://google.com/path?name=test"),
                                   "", "https://google.com/?name=test",),
                              ])
     def test_update_path(self, value, newvalue, expected):
         value.path = newvalue
         assert str(value) == expected
+
+    @pytest.mark.parametrize("value, newvalue, expected",
+                             [
+                                 (
+                                         UriParser3986().parse("https://google.com/path?name=test"),
+                                                                "//test.com/path?name=test",
+                                                                "https://test.com/path?name=test"
+                                 ),
+                                 (
+                                         UriParser3986().parse("https://google.com/path?name=test"),
+                                     "/newpath#asd",
+                                     "https://google.com/newpath#asd"
+                                 )
+                             ])
+    def test_update_relative_path(self, value, newvalue, expected):
+        try:
+            UriParser3986().uri_parser.parse("//test.com/path?name=test", start="relative_ref")
+        except Exception:
+            raise Exception("Invalid relative_ref value") from None
+        new_value = value.updated_relative_ref(newvalue)
+        assert new_value == expected

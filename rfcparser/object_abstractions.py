@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 def default_path(uri):
     uri_path = uri.path
 
-    if not uri_path:
+    if not uri_path or uri_path[0] != "/":
         return "/"
     if uri_path.count("/") == 1:
         return "/"
@@ -16,14 +16,20 @@ def default_path(uri):
 
 
 def path_matches(request_path, cookie_path):
+    if request_path == "":
+        request_path = "/"
+
     if request_path == cookie_path:
         return True
 
-    if request_path.startswith(cookie_path):
-        if cookie_path[-1] == "/":
-            return True
-        if request_path[0] == "/":
-            return True
+    if request_path.startswith(cookie_path) and cookie_path[-1] == "/":
+        return True
+    if (
+        request_path.startswith(cookie_path[1:])
+        and request_path[0] == "/"
+        and cookie_path[0] == "/"
+    ):
+        return True
     return False
 
 

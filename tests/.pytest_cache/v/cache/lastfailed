@@ -1,4 +1,0 @@
-{
-  "object_abstractions_test.py::TestUriTest::test_uri3986_test": true,
-  "object_abstractions_test.py::TestUri3986::test_update_relative_path[value1-/newpath#asd-https://test.com/newpath#asd]": true
-}

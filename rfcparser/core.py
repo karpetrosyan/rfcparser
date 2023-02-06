@@ -1,11 +1,10 @@
-import os
 from datetime import datetime
 from pathlib import Path
 
 from lark import Lark, Token
 
 from .exceptions import ParseException, ValidationException
-from .object_abstractions import SetCookie6265, Uri3986
+from .object_abstractions import Cookie6265, Uri3986
 
 # Files
 RFC6265_DATE = "grammars/rfc6265_date.lark"
@@ -29,7 +28,7 @@ class LazyLoadLark:
         if self.parser is None:
             path = str(Path(__file__).parent / self.value)
             with open(path) as f:
-                self.parser = Lark(open(path).read(), source_path=path, **self.kwargs)
+                self.parser = Lark(f.read(), source_path=path, **self.kwargs)
                 del self.kwargs
         return self.parser
 
@@ -66,7 +65,7 @@ class DateParser6265:
         try:
             self.date_parser.parse(value, start=start or self.default_start)
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def tree_parse(self, tree):
@@ -85,7 +84,6 @@ class DateParser6265:
         date_tokens_values = []
 
         for token in date_tokens.children:
-
             if (token.data == self.DATE_TOKEN) or ():
                 date_tokens_values.append(collect_tokens(token))
         for token in date_tokens_values:
@@ -96,7 +94,7 @@ class DateParser6265:
                 minute_value = int(m)
                 second_value = int(s)
             elif found_day_of_month is None and self.can_parse(
-                    token, self.DAY_OF_MONTH
+                token, self.DAY_OF_MONTH
             ):
                 found_day_of_month = token
                 day_of_month_value = int(token)
@@ -126,8 +124,8 @@ class DateParser6265:
                 missing_attributes.append("day_of_month")
             raise ValidationException(
                 (
-                        "One or more attributes aren't being"
-                        "passed. Missing attributes : %s" % (missing_attributes,)
+                    "One or more attributes aren't being"
+                    "passed. Missing attributes : %s" % (missing_attributes,)
                 )
             )
         if 1 > day_of_month_value or day_of_month_value > 31:
@@ -152,7 +150,6 @@ class DateParser6265:
         return date
 
     def parse(self, value, start=None):
-
         try:
             tree = self.date_parser.parse(value, start=start or self.default_start)
             return self.tree_parse(tree)
@@ -176,26 +173,29 @@ class SetCookieParser6265:
 
         for attrs_node in attrs_nodes:
             for attr in attrs_node.children:
-
                 if attr.data == "expires_av":
                     cookie_date_parser = DateParser6265()
-                    expire_date = cookie_date_parser.tree_parse(attr.children[0].children[0])
-                    attrs['Expires'] = expire_date
+                    expire_date = cookie_date_parser.tree_parse(
+                        attr.children[0].children[0]
+                    )
+                    attrs["Expires"] = expire_date
                 elif attr.data == "path_av":
                     path = collect_tokens(attr.children[0])
-                    attrs['Path'] = path
+                    attrs["Path"] = path
                 elif attr.data == "httponly_av":
-                    attrs['HttpOnly'] = True
+                    attrs["HttpOnly"] = True
                 elif attr.data == "max_age_av":
-                    attrs['Max-Age'] = collect_tokens(attr)
+                    attrs["Max-Age"] = int(collect_tokens(attr))
                 elif attr.data == "secure_av":
-                    attrs['Secure'] = True
+                    attrs["Secure"] = True
                 elif attr.data == "domain_av":
-                    attrs['Domain'] = collect_tokens(attr.children[0].children[0])
-                elif attr.data == 'extension_av':
-                    key, value = collect_tokens(attr).split('=')
+                    attrs["Domain"] = collect_tokens(attr.children[0].children[0])
+                elif attr.data == "extension_av":
+                    key, value = collect_tokens(attr).split("=")
                     attrs[key] = value
-        set_cookie = SetCookie6265(key=cookie_name, value=cookie_value, attrs=attrs, uri=uri)
+        set_cookie = Cookie6265(
+            key=cookie_name, value=cookie_value, attrs=attrs, uri=uri
+        )
 
         return set_cookie
 
@@ -283,15 +283,13 @@ class UriParser3986:
         port = None
         host = None
         userinfo = None
-        tmp_path = ""
-        path = None
+        path = ""
         query = {}
 
         query_temp_key_value = ["", ""]
         query_switch = 0
 
         for child in authority.children:
-
             if child:
                 if child.data == "host":
                     first_child = child.children[0]
@@ -313,7 +311,7 @@ class UriParser3986:
                     userinfo = collect_tokens(child)
 
         for child in path_tree.children:
-            tmp_path += "/" + collect_tokens(child)
+            path += "/" + collect_tokens(child)
 
         if query_tree:
             for child in query_tree.children:
@@ -336,7 +334,7 @@ class UriParser3986:
             port=int(port) if port else None,
             host=host,
             userinfo=userinfo,
-            path=tmp_path or path,
+            path=path or "/",
             query=query,
             fragment=fragment,
         )

@@ -1,45 +1,74 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def default_path(uri):
     uri_path = uri.path
 
-    if uri_path is None:
+    if not uri_path:
         return "/"
     if uri_path.count("/") == 1:
         return "/"
-    return ''.join(uri_path.split('/')[:-1])
+    assert len("".join(uri_path.split("/")[:-1]))
+
+    if uri_path.endswith("/"):
+        return uri_path[:-1]
+    return uri_path
 
 
-class SetCookie6265:
-    def __init__(self,
-                 key,
-                 value,
-                 uri,
-                 attrs):
+def path_matches(request_path, cookie_path):
+    if request_path == cookie_path:
+        return True
+
+    if request_path.startswith(cookie_path):
+        print("last", cookie_path[-1])
+        if cookie_path[-1] == "/":
+            return True
+        if request_path[0] == "/":
+            return True
+    return False
+
+
+class Cookie6265:
+    def __init__(self, key, value, uri, attrs):
         self.key = key
         self.value = value
         self.creation_time = self.last_access_time = datetime.now()
         self.persistent_flag = False
         self.expiry_time = None
-        self.domain = attrs.get('Domain', "")
+        self.domain = attrs.get("Domain", "")
 
-        max_age = attrs.get('Max-Age', None)
-        if max_age:
-            self.persistent_flag = True
-            self.expiry_time = max_age
+        if self.domain:
+            if not path_matches(uri.get_domain(), self.domain):
+                raise ValueError()
+            else:
+                self.host_only_flag = False
         else:
-            expires = attrs.get('Expires', None)
+            self.host_only_flag = True
+            self.domain = uri.get_domain()
+
+        max_age = attrs.get("Max-Age", None)
+        if max_age is not None:
+            self.persistent_flag = True
+            time = datetime.now()
+            if max_age > 0:
+                time += timedelta(seconds=max_age)
+                print(time, max_age)
+            self.expiry_time = time
+        else:
+            expires = attrs.get("Expires", None)
             if expires:
                 self.persistent_flag = True
                 self.expiry_time = expires
+            else:
+                self.persistent_flag = False
+                self.expiry_time = datetime.now()
 
         path = attrs.get("Path", None)
         if path:
             self.path = path
         else:
             self.path = default_path(uri)
-        secure = attrs.get('Secure', False)
+        secure = attrs.get("Secure", False)
         self.secure_only_flag = secure
         httponly = attrs.get("HttpOnly", False)
         self.http_only_flag = httponly
@@ -48,9 +77,7 @@ class SetCookie6265:
         return f"{self.key}={self.value}"
 
     def __repr__(self):
-        return f"<SetCookie6265 {str(self)} {self.creation_time=} {self.expiry_time=} {self.path=} " \
-               f"{self.persistent_flag=} {self.http_only_flag=} {self.domain=} {self.last_access_time=}>" \
-               f"{self.secure_only_flag=}"
+        return f"<SetCookie6265 {str(self)}"
 
 
 class Uri3986:
@@ -69,7 +96,7 @@ class Uri3986:
         port = f":{self.port}" if self.port else ""
         userinfo = f"{self.userinfo}@" if self.userinfo else ""
 
-        if value.startswith('//'):
+        if value.startswith("//"):
             return f"{self.scheme}:{value}"
         else:
             return f"{self.scheme}://{userinfo}{hostname}{port}{value}"
@@ -80,28 +107,30 @@ class Uri3986:
 
     @path.setter
     def path(self, newvalue):
-        if newvalue and not newvalue.startswith('/'):
-            newvalue = '/' + newvalue
+        if newvalue and not newvalue.startswith("/"):
+            newvalue = "/" + newvalue
         self._path = newvalue
 
     def get_domain(self):
         if self.ip:
             return self.ip
-        return '.'.join(self.host)
+        return ".".join(self.host)
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
             raise TypeError()
 
         return all(
-            (self.scheme == other.scheme,
-             self.ip == other.ip,
-             self.port == other.port,
-             self.host == other.host,
-             self.userinfo == other.userinfo,
-             self.path == other.path,
-             self.query == other.query,
-             self.fragment == other.fragment)
+            (
+                self.scheme == other.scheme,
+                self.ip == other.ip,
+                self.port == other.port,
+                self.host == other.host,
+                self.userinfo == other.userinfo,
+                self.path == other.path,
+                self.query == other.query,
+                self.fragment == other.fragment,
+            )
         )
 
     def __str__(self):
@@ -110,7 +139,11 @@ class Uri3986:
         path = self.path if self.path else "/"
         userinfo = f"{self.userinfo}@" if self.userinfo else ""
         fragment = f"#{self.fragment}" if self.fragment else ""
-        attrs = ("?" + '&'.join([f"{key}={value}" for key, value in self.query.items()])) if self.query else ""
+        attrs = (
+            ("?" + "&".join([f"{key}={value}" for key, value in self.query.items()]))
+            if self.query
+            else ""
+        )
         return f"{self.scheme}://{userinfo}{hostname}{port}{path}{attrs}{fragment}"
 
     def __repr__(self):

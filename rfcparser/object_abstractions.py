@@ -20,7 +20,6 @@ def path_matches(request_path, cookie_path):
         return True
 
     if request_path.startswith(cookie_path):
-        print("last", cookie_path[-1])
         if cookie_path[-1] == "/":
             return True
         if request_path[0] == "/":
@@ -52,7 +51,6 @@ class Cookie6265:
             time = datetime.now()
             if max_age > 0:
                 time += timedelta(seconds=max_age)
-                print(time, max_age)
             self.expiry_time = time
         else:
             expires = attrs.get("Expires", None)

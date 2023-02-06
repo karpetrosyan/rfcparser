@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -5,6 +6,8 @@ from lark import Lark, Token
 
 from .exceptions import ParseException, ValidationException
 from .object_abstractions import Cookie6265, Uri3986
+
+warnings.filterwarnings("ignore")
 
 # Files
 RFC6265_DATE = "grammars/rfc6265_date.lark"

@@ -183,7 +183,6 @@ class SetCookieParser6265:
         attrs = {}
         attrs_nodes = tuple(tree.find_data("cookie_av"))
         for attrs_node in attrs_nodes:
-            print(attrs_node.pretty())
             for attr in attrs_node.children:
                 if attr.data == "expires_av":
                     cookie_date_parser = DateParser6265()

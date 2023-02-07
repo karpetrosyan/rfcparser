@@ -130,7 +130,23 @@ class TestSetCookie6265:
                     secure_only_flag=False,
                     http_only_flag=False,
                 ),
-            )
+            ),
+            (
+                (
+                    "GPS=1; Domain=youtube.com; Expires=Tue, "
+                    "07-Feb-2023 13:20:04 GMT; Path=/; Secure; HttpOnly"
+                ),
+                UriParser3986().parse("https://youtube.com"),
+                dict(
+                    key="GPS",
+                    value="1",
+                    persistent_flag=True,
+                    domain="youtube.com",
+                    host_only_flag=False,
+                    secure_only_flag=True,
+                    http_only_flag=True,
+                ),
+            ),
         ],
     )
     def test_cookie_parse(self, value, uri, expected):

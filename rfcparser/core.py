@@ -17,6 +17,15 @@ RFC822_DOMAIN = "grammars/rfc822_domain.lark"
 RFC3986_URI = "grammars/rfc3986_uri.lark"
 
 
+def collect_tokens_recursive(tree):
+    if isinstance(tree.children[0], Token):
+        return [collect_tokens(tree)]
+    else:
+        return collect_tokens_recursive(tree.children[0]) + [
+            "".join(token.value for token in tree.children[1:])
+        ]
+
+
 def collect_tokens(tree):
     return "".join(token.value for token in tree.children)
 
@@ -173,8 +182,8 @@ class SetCookieParser6265:
 
         attrs = {}
         attrs_nodes = tuple(tree.find_data("cookie_av"))
-
         for attrs_node in attrs_nodes:
+            print(attrs_node.pretty())
             for attr in attrs_node.children:
                 if attr.data == "expires_av":
                     cookie_date_parser = DateParser6265()
@@ -192,10 +201,15 @@ class SetCookieParser6265:
                 elif attr.data == "secure_av":
                     attrs["Secure"] = True
                 elif attr.data == "domain_av":
-                    attrs["Domain"] = collect_tokens(attr.children[0].children[0])
+                    attrs["Domain"] = ".".join(
+                        collect_tokens_recursive(attr.children[0].children[0])
+                    )
                 elif attr.data == "extension_av":
                     key, value = collect_tokens(attr).split("=")
-                    attrs[key] = value
+                    if key.lower().startswith("expires"):
+                        cookie_date_parser = DateParser6265()
+                        expire_date = cookie_date_parser.parse(value)
+                        attrs["Expires"] = expire_date
         set_cookie = Cookie6265(
             key=cookie_name, value=cookie_value, attrs=attrs, uri=uri
         )

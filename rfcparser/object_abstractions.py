@@ -22,14 +22,16 @@ def path_matches(request_path, cookie_path):
     if request_path == cookie_path:
         return True
 
-    if request_path.startswith(cookie_path) and cookie_path[-1] == "/":
-        return True
-    if (
-        request_path.startswith(cookie_path[1:])
-        and request_path[0] == "/"
-        and cookie_path[0] == "/"
-    ):
-        return True
+    if len(request_path) > len(cookie_path) and request_path.startswith(cookie_path):
+        if cookie_path[-1] == "/":
+            #   The cookie-path is a prefix of the request-path, and the last
+            # 	character of the cookie-path is %x2F ("/").
+            return True
+        if request_path[0] == "/":
+            #   The cookie-path is a prefix of the request-path, and the
+            #   first character of the request-path that is not included in
+            #   the cookie-path is a %x2F ("/") character.
+            return True
     return False
 
 

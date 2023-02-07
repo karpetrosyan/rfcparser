@@ -337,7 +337,7 @@ class UriParser3986:
             port=int(port) if port else None,
             host=host,
             userinfo=userinfo,
-            path=path or "/",
+            path=path,
             query=query,
             fragment=fragment,
         )

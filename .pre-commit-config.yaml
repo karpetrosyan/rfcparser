@@ -12,3 +12,8 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
+  - repo: https://github.com/dhruvmanila/remove-print-statements
+    rev: v0.5.0
+    hooks:
+    - id: remove-print-statements
+      args: ['--verbose']   # Show all the print statements to be removed

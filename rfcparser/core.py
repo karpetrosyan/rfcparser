@@ -1,17 +1,16 @@
 import warnings
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from lark import Lark, Token
 
 from .exceptions import ParseException, ValidationException
-from .object_abstractions import Cookie6265, Uri3986
+from .object_abstractions import Cookie6265, Uri3986, default_path
 
 warnings.filterwarnings("ignore")
 
 # Files
 RFC6265_DATE = "grammars/rfc6265_date.lark"
-RFC6265_SETCOOKIE = "grammars/rfc6265_set_cookie.lark"
 RFC1034_DOMAIN = "grammars/rfc1034_domain.lark"
 RFC822_DOMAIN = "grammars/rfc822_domain.lark"
 RFC3986_URI = "grammars/rfc3986_uri.lark"
@@ -170,59 +169,98 @@ class DateParser6265:
 
 
 class SetCookieParser6265:
-    default_start = "set_cookie_header"
-    set_cookie_parser = LazyLoadLark(RFC6265_SETCOOKIE, start=["set_cookie_header"])
+    def validate(self, attrs, uri):
+        cleaned_attrs = {}
 
-    def tree_parse(self, tree, uri):
-        (cookie_name,) = tuple(tree.find_data("cookie_name"))
-        (cookie_value,) = tuple(tree.find_data("cookie_value"))
+        for attribute_name, attribute_value in attrs.items():
+            if attribute_name.lower() == "expires":
+                try:
+                    expiry_time = DateParser6265().parse(attribute_value)
+                except Exception:
+                    continue
+                cleaned_attrs["Expires"] = expiry_time
 
-        cookie_name = collect_tokens(cookie_name).strip()
-        cookie_value = collect_tokens(cookie_value).strip()
+            elif attribute_name.lower() == "max-age":
+                brk = False
+                if not (attribute_value[0].isdigit() or attribute_value[0] == "="):
+                    continue
 
-        attrs = {}
-        attrs_nodes = tuple(tree.find_data("cookie_av"))
-        for attrs_node in attrs_nodes:
-            for attr in attrs_node.children:
-                if attr.data == "expires_av":
-                    cookie_date_parser = DateParser6265()
-                    expire_date = cookie_date_parser.tree_parse(
-                        attr.children[0].children[0]
-                    )
-                    attrs["Expires"] = expire_date
-                elif attr.data == "path_av":
-                    path = collect_tokens(attr.children[0])
-                    attrs["Path"] = path
-                elif attr.data == "httponly_av":
-                    attrs["HttpOnly"] = True
-                elif attr.data == "max_age_av":
-                    attrs["Max-Age"] = int(collect_tokens(attr))
-                elif attr.data == "secure_av":
-                    attrs["Secure"] = True
-                elif attr.data == "domain_av":
-                    attrs["Domain"] = ".".join(
-                        collect_tokens_recursive(attr.children[0].children[0])
-                    )
-                elif attr.data == "extension_av":
-                    key, value = collect_tokens(attr).split("=")
-                    if key.lower().startswith("expires"):
-                        cookie_date_parser = DateParser6265()
-                        expire_date = cookie_date_parser.parse(value)
-                        attrs["Expires"] = expire_date
-        set_cookie = Cookie6265(
-            key=cookie_name, value=cookie_value, attrs=attrs, uri=uri
-        )
+                for char in attribute_value:
+                    if not char.isdigit():
+                        brk = True
+                        continue
+                if brk:
+                    continue
+                delta_seconds = int(attribute_value)
+                if delta_seconds <= 0:
+                    expiry_time = datetime.now()
+                else:
+                    expiry_time = datetime.now() + timedelta(seconds=delta_seconds)
+                cleaned_attrs["Max-Age"] = expiry_time
 
-        return set_cookie
+            elif attribute_name.lower() == "domain":
+                if not attribute_value:
+                    continue
+
+                if attribute_value[0] == ".":
+                    cookie_domain = attribute_value[1:]
+                else:
+                    cookie_domain = attribute_value
+                cookie_domain = cookie_domain.lower()
+                cleaned_attrs["Domain"] = cookie_domain
+
+            elif attribute_name.lower() == "path":
+                if (not attribute_value) or (attribute_value[0] != "/"):
+                    cookie_path = default_path(uri)
+                else:
+                    cookie_path = attribute_value
+                cleaned_attrs["Path"] = cookie_path
+
+            elif attribute_name.lower() == "secure":
+                cleaned_attrs["Secure"] = ""
+            elif attribute_name.lower() == "httponly":
+                cleaned_attrs["HttpOnly"] = ""
+
+        return cleaned_attrs
 
     def parse(self, value, uri, start=None):
-        try:
-            tree = self.set_cookie_parser.parse(
-                value, start=start or self.default_start
-            )
-            return self.tree_parse(tree, uri)
-        except Exception as ex:
-            raise ParseException from ex
+        if ";" in value:
+            name_value_pair = value.split(";")[0]
+            unparsed_attributes = value[value.find(";") :]
+        else:
+            name_value_pair = value
+            unparsed_attributes = ""
+        eq_ind = name_value_pair.find("=")
+        if eq_ind == -1:
+            return None
+        name = name_value_pair[:eq_ind].strip()
+        value = name_value_pair[eq_ind + 1 :].strip()
+        attrs = {}
+
+        if not name:
+            raise None
+
+        while unparsed_attributes:
+            unparsed_attributes = unparsed_attributes[1:]
+            sep_ind = unparsed_attributes.find(";")
+            if sep_ind != -1:
+                cookie_av = unparsed_attributes[:sep_ind]
+            else:
+                cookie_av = unparsed_attributes
+            eq_ind = cookie_av.find("=")
+            if eq_ind != -1:
+                attribute_name = cookie_av[:eq_ind]
+                attribute_value = cookie_av[eq_ind + 1 :]
+            else:
+                attribute_name = cookie_av
+                attribute_value = ""
+            attribute_name = attribute_name.strip()
+            attribute_value = attribute_value.strip()
+            attrs[attribute_name] = attribute_value
+            unparsed_attributes = unparsed_attributes[sep_ind:]
+
+        cleaned_attrs = self.validate(attrs, uri)
+        return Cookie6265(key=name, value=value, uri=uri, attrs=cleaned_attrs)
 
 
 class DomainParser822:

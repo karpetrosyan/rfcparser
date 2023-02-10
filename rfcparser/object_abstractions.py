@@ -74,10 +74,8 @@ class Cookie6265:
             self.path = path
         else:
             self.path = default_path(uri)
-        secure = attrs.get("Secure", False)
-        self.secure_only_flag = secure
-        httponly = attrs.get("HttpOnly", False)
-        self.http_only_flag = httponly
+        self.secure_only_flag = "Secure" in attrs
+        self.http_only_flag = "HttpOnly" in attrs
 
     def __str__(self):
         return f"{self.key}={self.value}"

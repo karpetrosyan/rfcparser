@@ -1,10 +1,12 @@
+import ipaddress
+import re
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from lark import Lark, Token
 
-from .exceptions import ParseException, ValidationException
+from .exceptions import ParseException
 from .object_abstractions import Cookie6265, Uri3986, default_path
 
 warnings.filterwarnings("ignore")
@@ -45,11 +47,21 @@ class LazyLoadLark:
 
 
 class DateParser6265:
-    default_start = "cookie_date"
-    date_parser = LazyLoadLark(
-        RFC6265_DATE, start=["cookie_date", "time", "year", "month", "day_of_month"]
+    non_delimiter_ranges = (
+        (0x00, 0x08),
+        (0x0A, 0x1F),
+        (48, 58),
+        (97, 123),
+        (0x7F, 0xFF),
+        (65, 91),
     )
+    non_delimiter = {
+        ":",
+    } | set(chr(i) for start, end in non_delimiter_ranges for i in range(start, end))
 
+    hms_time_regex = re.compile(r"(\d{1,2}:){2}\d{1,2}")
+    year_regex = re.compile(r"\d{2,4}")
+    day_of_month_regex = re.compile(r"\d{1,2}")
     month_map = {
         "jan": 1,
         "feb": 2,
@@ -65,107 +77,102 @@ class DateParser6265:
         "dec": 12,
     }
 
-    # rules
-    DATE_TOKEN = "date_token"
-    TIME = "time"
-    YEAR = "year"
-    MONTH = "month"
-    DAY_OF_MONTH = "day_of_month"
+    def validate(
+        self,
+        year_value,
+        minute_value,
+        second_value,
+        day_of_month_value,
+        month_value,
+        hour_value,
+        found_month,
+        found_year,
+        found_time,
+    ):
+        if 70 <= year_value <= 99:
+            year_value += 1900
+        if 0 <= year_value <= 69:
+            year_value += 2000
 
-    def can_parse(self, value, start=None):
-        try:
-            self.date_parser.parse(value, start=start or self.default_start)
-            return True
-        except Exception:
-            return False
+        if (
+            not (all((day_of_month_value, found_month, found_year, found_time)))
+            and (1 <= day_of_month_value <= 31)
+            and (year_value < 1601)
+            and (hour_value > 23)
+            and (minute_value > 59)
+            and (second_value > 59)
+        ):
+            raise ValueError("Invalid date")
+        return datetime(
+            year=year_value,
+            month=month_value,
+            day=day_of_month_value,
+            hour=hour_value,
+            minute=minute_value,
+            second=second_value,
+        )
 
-    def tree_parse(self, tree):
+    def parse(self, date):
+        date_tokens = []
+        start = None
+
+        for ind, char in enumerate(date):
+            if char not in self.non_delimiter:
+                if start is not None:
+                    date_tokens.append(date[start:ind])
+                    start = None
+            else:
+                if start is None:
+                    start = ind
+        if start is not None:
+            date_tokens.append(date[start:])
+
         found_time = None
         found_day_of_month = None
         found_month = None
         found_year = None
+
         hour_value = None
         minute_value = None
         second_value = None
-        year_value = None
         day_of_month_value = None
         month_value = None
+        year_value = None
 
-        date_tokens = tree.children[0]
-        date_tokens_values = []
+        for token in date_tokens:
+            if not found_time and self.hms_time_regex.match(token):
+                found_time = True
+                hour_value, minute_value, second_value = token.split(":")
+                hour_value = int(hour_value)
+                minute_value = int(minute_value)
+                second_value = int(second_value)
 
-        for token in date_tokens.children:
-            if (token.data == self.DATE_TOKEN) or ():
-                date_tokens_values.append(collect_tokens(token))
-        for token in date_tokens_values:
-            if (found_time is None) and self.can_parse(token, self.TIME):
-                found_time = token
-                h, m, s = token.split(":")
-                hour_value = int(h)
-                minute_value = int(m)
-                second_value = int(s)
-            elif found_day_of_month is None and self.can_parse(
-                token, self.DAY_OF_MONTH
-            ):
-                found_day_of_month = token
+            elif not found_month and token.lower() in self.month_map:
+                found_month = True
+                month_value = int(self.month_map[token.lower()])
+
+            elif not found_day_of_month and self.day_of_month_regex.match(token):
+                found_day_of_month = True
                 day_of_month_value = int(token)
 
-            elif found_month is None and self.can_parse(token, self.MONTH):
-                found_month = token
-                month_value = self.month_map[token.lower()]
-            elif found_year is None and self.can_parse(token, self.YEAR):
-                found_year = token
+            elif not found_year and self.year_regex.match(token):
+                found_year = True
                 year_value = int(token)
 
-        if 70 <= year_value <= 99:
-            year_value += 1900
-
-        elif 0 <= year_value <= 99:
-            year_value += 2000
-
-        if not (found_time and found_month and found_year and found_day_of_month):
-            missing_attributes = []
-            if not found_time:
-                missing_attributes.append("time")
-            if not found_month:
-                missing_attributes.append("month")
-            if not found_year:
-                missing_attributes.append("year")
-            if not found_day_of_month:
-                missing_attributes.append("day_of_month")
-            raise ValidationException(
-                (
-                    "One or more attributes aren't being"
-                    "passed. Missing attributes : %s" % (missing_attributes,)
-                )
-            )
-        if 1 > day_of_month_value or day_of_month_value > 31:
-            raise ValidationException("The month's day must be between [1, 31].")
-        if year_value < 1601:
-            raise ValidationException("The year value must be greater than 1600.")
-        if hour_value > 23:
-            raise ValidationException("The hour value cannot be greater than 23.")
-        if minute_value > 59:
-            raise ValidationException("The minute value cannot be greater than 59.")
-        if second_value > 59:
-            raise ValidationException("The second value cannot be greater than 59.")
-
-        date = datetime(
-            year=year_value,
-            day=day_of_month_value,
-            month=month_value,
-            minute=minute_value,
-            hour=hour_value,
-            second=second_value,
-        )
-        return date
-
-    def parse(self, value, start=None):
         try:
-            tree = self.date_parser.parse(value, start=start or self.default_start)
-            return self.tree_parse(tree)
-        except Exception as ex:
-            raise ParseException from ex
+            return self.validate(
+                year_value=year_value,
+                month_value=month_value,
+                second_value=second_value,
+                minute_value=minute_value,
+                hour_value=hour_value,
+                day_of_month_value=day_of_month_value,
+                found_month=found_month,
+                found_year=found_year,
+                found_time=found_time,
+            )
+        except Exception:
+            return None
 
 
 class SetCookieParser6265:
@@ -313,89 +320,59 @@ class DomainParser1034:
 
 
 class UriParser3986:
-    default_start = "uri"
-    uri_parser = LazyLoadLark(RFC3986_URI, start=["uri", "relative_ref"])
+    uri_parsing_regex = re.compile(
+        r"^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?"
+    )
 
-    def tree_parse(self, tree):
-        # trees
-        (authority,) = tree.find_data("authority")
-        (hier_part,) = tree.find_data("hier_part")
-        path_tree = hier_part.children[-1]
+    def parse(self, value):
+        match = self.uri_parsing_regex.search(value)
+        if not match:
+            return None
+
+        query_dict = {}
+        scheme = match.group(2)
+        authority = match.group(4)
+        path = match.group(5)
+        query = match.group(7)
+        fragment = match.group(9)
+
+        sep_ind = authority.find("@")
+        if sep_ind != -1:
+            userinfo = authority[:sep_ind]
+            authority = authority[sep_ind + 1 :]
+        else:
+            userinfo = None
+
+        sep_ind = authority.find(":")
+        if sep_ind != -1:
+            port = int(authority[sep_ind + 1 :])
+            authority = authority[:sep_ind]
+        else:
+            port = None
+
+        host = authority
         try:
-            (query_tree,) = tree.find_data("query")
-        except ValueError:
-            query_tree = None
-        try:
-            (fragment,) = tree.find_data("fragment")
-            fragment = collect_tokens(fragment)
-        except ValueError:
-            fragment = None
+            ipaddress.ip_address(host)
+            ip = host
+            host = None
+        except Exception:
+            ip = None
 
-        scheme = collect_tokens(tree.children[0])
-        tmp_ip = ""
-        ip = None
-        port = None
-        host = None
-        userinfo = None
-        path = ""
-        query = {}
+        if query:
+            for key_value in query.split("&"):
+                key, value = key_value.split("=")
+                query_dict[key] = value
 
-        query_temp_key_value = ["", ""]
-        query_switch = 0
-
-        for child in authority.children:
-            if child:
-                if child.data == "host":
-                    first_child = child.children[0]
-                    if first_child.data == "ip_4address":
-                        for dec_octet in first_child.children:
-                            tmp_ip += collect_tokens(dec_octet) + "."
-                        tmp_ip = tmp_ip[:-1]
-                    elif first_child.data == "reg_name":
-                        host = collect_tokens(first_child).split(".")
-                    elif first_child.data == "ip_6address":
-                        raise NotImplementedError(
-                            "Parsertool does not support ipv6 addresses"
-                        )
-
-                elif child.data == "port":
-                    port = collect_tokens(child)
-
-                elif child.data == "userinfo":
-                    userinfo = collect_tokens(child)
-
-        for child in path_tree.children:
-            path += "/" + collect_tokens(child)
-
-        if query_tree:
-            for child in query_tree.children:
-                if not isinstance(child, Token):
-                    query_switch += 1
-                    if query_switch == 2:
-                        key, value = query_temp_key_value
-                        query[key] = value
-                        query_temp_key_value = ["", ""]
-                        query_switch = 0
-                else:
-                    query_temp_key_value[query_switch] += child.value
-            if query_switch == 1:
-                key, value = query_temp_key_value
-                query[key] = value
+        if host:
+            host = host.split(".")
 
         return Uri3986(
             scheme=scheme,
-            ip=tmp_ip or ip,
+            ip=ip,
             port=int(port) if port else None,
             host=host,
             userinfo=userinfo,
             path=path,
-            query=query,
+            query=query_dict,
             fragment=fragment,
         )
-
-    def parse(self, value, start=None):
-        try:
-            tree = self.uri_parser.parse(value, start=start or self.default_start)
-            return self.tree_parse(tree)
-        except Exception as ex:
-            raise ParseException from ex

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from rfcparser.core import SetCookieParser6265, UriParser3986
+from rfcparser.core import DateParser6265, SetCookieParser6265, UriParser3986
 from rfcparser.object_abstractions import Cookie6265, Uri3986, path_matches
 
 
@@ -104,12 +104,6 @@ class TestUri3986:
         ],
     )
     def test_update_relative_path(self, value, newvalue, expected):
-        try:
-            UriParser3986().uri_parser.parse(
-                "//test.com/path?name=test", start="relative_ref"
-            )
-        except Exception:
-            raise Exception("Invalid relative_ref value") from None
         new_value = value.updated_relative_ref(newvalue)
         assert new_value == expected
 
@@ -188,6 +182,24 @@ class TestSetCookie6265:
         assert cookie.host_only_flag == expected["host_only_flag"]
         assert cookie.secure_only_flag == expected["secure_only_flag"]
         assert cookie.http_only_flag == expected["http_only_flag"]
+
+
+class TestDateParser6265:
+    @pytest.mark.parametrize(
+        "value, expected",
+        (
+            (
+                "Tue, 07-Feb-2023 13:20:04 GMT",
+                datetime(day=7, month=2, year=2023, hour=13, minute=20, second=4),
+            ),
+            (
+                "Tue, 25-Aug-2003 17:45:04 GMT",
+                datetime(day=25, month=8, year=2003, hour=17, minute=45, second=4),
+            ),
+        ),
+    )
+    def test_date_parser(self, value, expected):
+        assert DateParser6265().parse(value) == expected
 
 
 @pytest.mark.parametrize(

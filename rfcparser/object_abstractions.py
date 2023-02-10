@@ -112,14 +112,14 @@ class Uri3986:
         self.fragment = fragment
 
     def updated_relative_ref(self, value):
-        hostname = self.ip or ".".join(self.host)
-        port = f":{self.port}" if self.port else ""
-        userinfo = f"{self.userinfo}@" if self.userinfo else ""
-
         if value.startswith("//"):
-            return f"{self.scheme}:{value}"
+            value = f"{self.scheme}:{value}"
         else:
-            return f"{self.scheme}://{userinfo}{hostname}{port}{value}"
+            userinfo = f"{self.userinfo}@" if self.userinfo else ""
+            hostname = self.ip or ".".join(self.host)
+            port = f":{self.port}" if self.port else ""
+            value = f"{self.scheme}://{userinfo}{hostname}{port}{value}"
+        return value
 
     @property
     def path(self):

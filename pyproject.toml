@@ -10,15 +10,17 @@ readme = "README.md"
 description = "Rfcparser is a Python tool that makes it easy to parse common RFC syntaxes. Rfcparser takes a raw string as input, parses, validates, and returns Python objects to simplify the processing of RFC syntaxes."
 license-files = { paths = ["LICENSE"]}
 
+classifiers = [
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Intended Audience :: Developers",
+    "Topic :: Internet :: WWW/HTTP",
+]
+
+
 [project.urls]
 Homepage = "https://github.com/karosis88/rfcparser.git"
 Source = "https://github.com/karosis88/rfcparser.git"
 
-classifiers = [
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Intended Audience :: Developers",
-    "Topic :: Internet :: WWW/HTTP"
-]
 
 [tool.isort]
 profile = "black"

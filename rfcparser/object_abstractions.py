@@ -1,3 +1,4 @@
+import ipaddress
 from datetime import datetime, timedelta
 
 
@@ -35,6 +36,21 @@ def path_matches(request_path, cookie_path):
     return False
 
 
+def domain_matches(string: str, domain_string: str) -> bool:
+    string = string.lower()
+    domain_string = domain_string.lower()
+    try:
+        ipaddress.ip_address(string)
+        is_host = False
+    except ValueError:
+        is_host = True
+    return string == domain_string or (
+        string.endswith(domain_string)
+        and string[-(len(domain_string) + 1)] == "."
+        and is_host
+    )
+
+
 class Cookie6265:
     def __init__(self, key, value, uri, attrs):
         self.key = key
@@ -45,7 +61,7 @@ class Cookie6265:
         self.domain = attrs.get("Domain", "")
 
         if self.domain:
-            if not path_matches(uri.get_domain(), self.domain):
+            if not domain_matches(uri.get_domain(), self.domain):
                 raise ValueError()
             else:
                 self.host_only_flag = False

@@ -1,3 +1,5 @@
+# NOTE: Merged with [aioreq](https://github.com/karosis88/aioreq)
+
 # Rfcparser
 Rfcparser is a Python tool that makes it easy to parse common RFC syntaxes. Rfcparser takes a raw string as input, parses, validates, and returns Python objects to simplify the processing of RFC syntaxes.
 
